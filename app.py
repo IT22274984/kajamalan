@@ -1,9 +1,15 @@
 import streamlit as st
 import joblib
 import spacy
+import subprocess
 
-# Load spaCy model
-nlp = spacy.load("en_core_web_sm")
+# Attempt to load spaCy model, download if missing
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    st.warning("Downloading 'en_core_web_sm' model... Please wait.")
+    subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
+    nlp = spacy.load("en_core_web_sm")
 
 # Function to preprocess text
 def preprocess_text(text):
@@ -12,22 +18,25 @@ def preprocess_text(text):
     return " ".join(words)
 
 # Load model and vectorizer
-loaded_model = joblib.load("best_sentiment_model.pkl")
-loaded_vectorizer = joblib.load("tfidf_vectorizer.pkl")
+try:
+    loaded_model = joblib.load("best_sentiment_model.pkl")
+    loaded_vectorizer = joblib.load("tfidf_vectorizer.pkl")
+except FileNotFoundError:
+    st.error("Error: Model files not found! Ensure `best_sentiment_model.pkl` and `tfidf_vectorizer.pkl` are present.")
 
 # Predict sentiment function
 def predict_sentiment_loaded(text, model=loaded_model):
     processed_text = preprocess_text(text)
     vectorized_text = loaded_vectorizer.transform([processed_text])
     prediction = model.predict(vectorized_text)[0]
-    
+
     sentiment_map = {
         1: ('😊 Positive', 'green'),
         0: ('😞 Negative', 'red'),
         2: ('😐 Neutral', 'orange')
     }
     
-    return sentiment_map[prediction]
+    return sentiment_map.get(prediction, ('🤔 Unknown', 'gray'))
 
 # Streamlit UI
 st.set_page_config(page_title="Airline Sentiment Analysis", layout="centered")
@@ -36,7 +45,7 @@ st.set_page_config(page_title="Airline Sentiment Analysis", layout="centered")
 st.markdown("""
     <style>
         .sentiment-result {
-            font-size: 18px;  /* Reduced font size */
+            font-size: 18px; 
             font-weight: bold;
             text-align: center;
             padding: 8px;
